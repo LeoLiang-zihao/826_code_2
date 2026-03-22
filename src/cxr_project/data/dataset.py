@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-from PIL import Image
+from PIL import Image, ImageFile
 from torch.utils.data import Dataset
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class ChestXrayDataset(Dataset):
