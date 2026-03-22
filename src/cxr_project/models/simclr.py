@@ -13,6 +13,7 @@ class ProjectionHead(nn.Module):
         super().__init__()
         self.layers = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
             nn.ReLU(inplace=True),
             nn.Linear(hidden_dim, output_dim),
         )
@@ -70,5 +71,11 @@ class LightningSimCLR(L.LightningModule):
             self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, batch_size=int(view1.shape[0]))
         return loss
 
-    def configure_optimizers(self) -> torch.optim.Optimizer:
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay)
+    def configure_optimizers(self) -> dict:
+        optimizer = torch.optim.AdamW(
+            self.parameters(), lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=self.trainer.max_epochs, eta_min=1e-6
+        )
+        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "epoch"}}

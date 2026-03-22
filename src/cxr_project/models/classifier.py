@@ -4,10 +4,27 @@ from typing import Any
 
 import lightning as L
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
 from cxr_project.models.backbones import build_backbone
+
+
+class FocalLoss(nn.Module):
+    """Binary focal loss for class-imbalanced classification."""
+
+    def __init__(self, gamma: float = 2.0, alpha: float = 0.75) -> None:
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        bce = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        pt = torch.exp(-bce)
+        alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
+        focal = alpha_t * (1 - pt) ** self.gamma * bce
+        return focal.mean()
 
 
 class LightningBinaryClassifier(L.LightningModule):
@@ -19,6 +36,12 @@ class LightningBinaryClassifier(L.LightningModule):
         learning_rate: float = 1e-3,
         weight_decay: float = 1e-4,
         encoder_checkpoint_path: str | None = None,
+        loss_type: str = "bce",
+        focal_gamma: float = 2.0,
+        focal_alpha: float = 0.75,
+        pos_weight: float = 1.0,
+        label_smoothing: float = 0.0,
+        backbone_lr_factor: float = 1.0,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -28,7 +51,14 @@ class LightningBinaryClassifier(L.LightningModule):
         self.encoder_stages = bundle.stages
         self.target_layer = bundle.target_layer
         self.head = nn.Linear(bundle.feature_dim, 1)
-        self.loss_fn = nn.BCEWithLogitsLoss()
+
+        if loss_type == "focal":
+            self.loss_fn = FocalLoss(gamma=focal_gamma, alpha=focal_alpha)
+        else:
+            self.loss_fn = nn.BCEWithLogitsLoss(
+                pos_weight=torch.tensor([pos_weight]) if pos_weight != 1.0 else None
+            )
+
         self.val_auroc = BinaryAUROC()
         self.val_ap = BinaryAveragePrecision()
         self.test_auroc = BinaryAUROC()
@@ -87,7 +117,14 @@ class LightningBinaryClassifier(L.LightningModule):
         labels = batch["label"].float()
         logits = self(images)
         probabilities = torch.sigmoid(logits)
-        loss = self.loss_fn(logits, labels)
+
+        smoothing = float(self.hparams.label_smoothing)
+        if smoothing > 0 and stage == "train":
+            smooth_labels = labels * (1 - smoothing) + 0.5 * smoothing
+        else:
+            smooth_labels = labels
+
+        loss = self.loss_fn(logits, smooth_labels)
         batch_size = int(labels.shape[0])
 
         self.log(f"{stage}_loss", loss, prog_bar=True, on_epoch=True, on_step=(stage == "train"), batch_size=batch_size)
@@ -122,6 +159,23 @@ class LightningBinaryClassifier(L.LightningModule):
         self.test_auroc.reset()
         self.test_ap.reset()
 
-    def configure_optimizers(self) -> torch.optim.Optimizer:
-        parameters = [parameter for parameter in self.parameters() if parameter.requires_grad]
-        return torch.optim.Adam(parameters, lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay)
+    def configure_optimizers(self) -> dict:
+        backbone_lr_factor = float(self.hparams.backbone_lr_factor)
+        backbone_params = [p for p in self.encoder.parameters() if p.requires_grad]
+        head_params = list(self.head.parameters())
+
+        if backbone_params and backbone_lr_factor != 1.0:
+            param_groups = [
+                {"params": backbone_params, "lr": self.hparams.learning_rate * backbone_lr_factor},
+                {"params": head_params, "lr": self.hparams.learning_rate},
+            ]
+        else:
+            param_groups = [{"params": backbone_params + head_params}]
+
+        optimizer = torch.optim.AdamW(
+            param_groups, lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=self.trainer.max_epochs, eta_min=1e-6
+        )
+        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "epoch"}}

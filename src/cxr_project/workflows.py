@@ -6,7 +6,7 @@ from typing import Iterable
 import lightning as L
 import pandas as pd
 import torch
-from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import CSVLogger
 
 from cxr_project.data.synthetic import generate_synthetic_dataset
@@ -36,7 +36,7 @@ def build_csv_logger(output_dir: Path, name: str = "logs") -> CSVLogger:
     return CSVLogger(save_dir=str(output_dir), name=name)
 
 
-def build_checkpoint_callback(output_dir: Path, monitor: str = "val_loss", mode: str = "min") -> ModelCheckpoint:
+def build_checkpoint_callback(output_dir: Path, monitor: str = "val_auroc", mode: str = "max") -> ModelCheckpoint:
     return ModelCheckpoint(
         dirpath=output_dir / "checkpoints",
         filename="best",
@@ -44,6 +44,10 @@ def build_checkpoint_callback(output_dir: Path, monitor: str = "val_loss", mode:
         monitor=monitor,
         mode=mode,
     )
+
+
+def build_early_stopping(monitor: str = "val_auroc", mode: str = "max", patience: int = 5) -> EarlyStopping:
+    return EarlyStopping(monitor=monitor, mode=mode, patience=patience, verbose=True)
 
 
 def build_trainer(config: dict, output_dir: Path, logger: CSVLogger, callbacks: Iterable) -> L.Trainer:
@@ -63,14 +67,27 @@ def build_trainer(config: dict, output_dir: Path, logger: CSVLogger, callbacks: 
     )
 
 
-def collect_predictions(model: L.LightningModule, dataloader, device: torch.device, split: str) -> pd.DataFrame:
+def collect_predictions(
+    model: L.LightningModule,
+    dataloader,
+    device: torch.device,
+    split: str,
+    tta: bool = False,
+) -> pd.DataFrame:
     model.eval()
     rows: list[dict[str, object]] = []
     with torch.no_grad():
         for batch in dataloader:
             images = batch["image"].to(device)
             logits = model(images)
-            probabilities = torch.sigmoid(logits).cpu().numpy()
+
+            if tta:
+                flipped = torch.flip(images, dims=[-1])
+                logits_flip = model(flipped)
+                probabilities = torch.sigmoid((logits + logits_flip) / 2).cpu().numpy()
+            else:
+                probabilities = torch.sigmoid(logits).cpu().numpy()
+
             labels = batch["label"].cpu().numpy()
             for index, probability in enumerate(probabilities):
                 rows.append(
@@ -114,6 +131,12 @@ def load_classifier_checkpoint(checkpoint_path: str | Path, model_config: dict) 
         fine_tune_mode=model_config["fine_tune_mode"],
         learning_rate=float(model_config["learning_rate"]),
         weight_decay=float(model_config["weight_decay"]),
+        loss_type=model_config.get("loss_type", "bce"),
+        focal_gamma=float(model_config.get("focal_gamma", 2.0)),
+        focal_alpha=float(model_config.get("focal_alpha", 0.75)),
+        pos_weight=float(model_config.get("pos_weight", 1.0)),
+        label_smoothing=float(model_config.get("label_smoothing", 0.0)),
+        backbone_lr_factor=float(model_config.get("backbone_lr_factor", 1.0)),
     )
 
 

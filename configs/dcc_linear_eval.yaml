@@ -1,7 +1,7 @@
 seed: 826
 output_dir: outputs/dcc_linear_eval
 data:
-  manifest_path: /work/your_netid/cxr_project/data/manifests/mimic_subset_manifest.csv
+  manifest_path: /work/zl467/cxr_project/data/manifests/mimic_subset_manifest.csv
   batch_size: 32
   num_workers: 4
   image_size: 224
@@ -11,15 +11,21 @@ model:
   fine_tune_mode: head_only
   learning_rate: 0.001
   weight_decay: 0.0001
+  loss_type: focal
+  focal_gamma: 2.0
+  focal_alpha: 0.75
 trainer:
   accelerator: gpu
   devices: 1
-  max_epochs: 8
+  max_epochs: 20
   precision: 16-mixed
   deterministic: true
   limit_train_batches: 1.0
   limit_val_batches: 1.0
   log_every_n_steps: 10
+  early_stopping_patience: 5
 runtime:
   experiment_name: dcc_linear_eval
   create_manifest_if_missing: false
+inference:
+  tta: true

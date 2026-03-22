@@ -11,6 +11,7 @@ from cxr_project.utils.seed import seed_everything
 from cxr_project.workflows import (
     build_checkpoint_callback,
     build_csv_logger,
+    build_early_stopping,
     build_trainer,
     choose_device,
     collect_predictions,
@@ -50,8 +51,14 @@ def main() -> None:
     load_encoder_from_simclr_checkpoint(model, args.simclr_checkpoint)
 
     logger = build_csv_logger(output_dir, name="linear_eval_logs")
-    checkpoint = build_checkpoint_callback(output_dir, monitor="val_loss", mode="min")
-    trainer = build_trainer(config, output_dir, logger, [checkpoint])
+    checkpoint = build_checkpoint_callback(output_dir, monitor="val_auroc", mode="max")
+
+    callbacks = [checkpoint]
+    patience = config["trainer"].get("early_stopping_patience", 0)
+    if patience > 0:
+        callbacks.append(build_early_stopping(monitor="val_auroc", mode="max", patience=patience))
+
+    trainer = build_trainer(config, output_dir, logger, callbacks)
     trainer.fit(model, datamodule=datamodule)
     trainer.test(model=model, datamodule=datamodule, ckpt_path="best")
 
@@ -69,8 +76,9 @@ def main() -> None:
     model.to(device)
     datamodule.setup()
 
-    val_predictions = collect_predictions(model, datamodule.val_dataloader(), device, "val")
-    test_predictions = collect_predictions(model, datamodule.test_dataloader(), device, "test")
+    use_tta = config.get("inference", {}).get("tta", False)
+    val_predictions = collect_predictions(model, datamodule.val_dataloader(), device, "val", tta=use_tta)
+    test_predictions = collect_predictions(model, datamodule.test_dataloader(), device, "test", tta=use_tta)
     metrics = {
         "val": summarize_predictions(val_predictions, output_dir, "val", n_bootstrap=args.bootstrap, seed=int(config["seed"])),
         "test": summarize_predictions(test_predictions, output_dir, "test", n_bootstrap=args.bootstrap, seed=int(config["seed"])),
@@ -81,4 +89,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

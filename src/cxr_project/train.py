@@ -10,6 +10,7 @@ from cxr_project.utils.seed import seed_everything
 from cxr_project.workflows import (
     build_checkpoint_callback,
     build_csv_logger,
+    build_early_stopping,
     build_trainer,
     choose_device,
     collect_predictions,
@@ -43,11 +44,23 @@ def main() -> None:
         fine_tune_mode=config["model"]["fine_tune_mode"],
         learning_rate=float(config["model"]["learning_rate"]),
         weight_decay=float(config["model"]["weight_decay"]),
+        loss_type=config["model"].get("loss_type", "bce"),
+        focal_gamma=float(config["model"].get("focal_gamma", 2.0)),
+        focal_alpha=float(config["model"].get("focal_alpha", 0.75)),
+        pos_weight=float(config["model"].get("pos_weight", 1.0)),
+        label_smoothing=float(config["model"].get("label_smoothing", 0.0)),
+        backbone_lr_factor=float(config["model"].get("backbone_lr_factor", 1.0)),
     )
 
     logger = build_csv_logger(output_dir)
-    checkpoint = build_checkpoint_callback(output_dir, monitor="val_loss", mode="min")
-    trainer = build_trainer(config, output_dir, logger, [checkpoint])
+    checkpoint = build_checkpoint_callback(output_dir, monitor="val_auroc", mode="max")
+
+    callbacks = [checkpoint]
+    patience = config["trainer"].get("early_stopping_patience", 0)
+    if patience > 0:
+        callbacks.append(build_early_stopping(monitor="val_auroc", mode="max", patience=patience))
+
+    trainer = build_trainer(config, output_dir, logger, callbacks)
 
     trainer.fit(model, datamodule=datamodule)
     best_path = checkpoint.best_model_path or None
@@ -59,8 +72,9 @@ def main() -> None:
     model.to(device)
     datamodule.setup()
 
-    val_predictions = collect_predictions(model, datamodule.val_dataloader(), device, "val")
-    test_predictions = collect_predictions(model, datamodule.test_dataloader(), device, "test")
+    use_tta = config.get("inference", {}).get("tta", False)
+    val_predictions = collect_predictions(model, datamodule.val_dataloader(), device, "val", tta=use_tta)
+    test_predictions = collect_predictions(model, datamodule.test_dataloader(), device, "test", tta=use_tta)
 
     metrics = {
         "val": summarize_predictions(val_predictions, output_dir, "val", n_bootstrap=args.bootstrap, seed=int(config["seed"])),

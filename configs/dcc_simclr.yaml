@@ -1,8 +1,8 @@
 seed: 826
 output_dir: outputs/dcc_simclr
 data:
-  manifest_path: /work/your_netid/cxr_project/data/manifests/mimic_subset_manifest.csv
-  batch_size: 64
+  manifest_path: /work/zl467/cxr_project/data/manifests/mimic_subset_manifest.csv
+  batch_size: 128
   num_workers: 4
   image_size: 224
 model:
@@ -14,7 +14,7 @@ model:
 trainer:
   accelerator: gpu
   devices: 1
-  max_epochs: 10
+  max_epochs: 30
   precision: 16-mixed
   deterministic: true
   limit_train_batches: 1.0
@@ -28,6 +28,6 @@ simclr:
   weight_decay: 0.0001
   projection_hidden_dim: 512
   projection_dim: 128
-  temperature: 0.2
+  temperature: 0.15
 evaluation:
   bootstrap_samples: 1000

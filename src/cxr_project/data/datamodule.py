@@ -46,11 +46,42 @@ class ChestXrayDataModule(L.LightningDataModule):
         self.val_dataset = ChestXrayDataset(val_frame, transform=build_eval_transforms(self.image_size))
         self.test_dataset = ChestXrayDataset(test_frame, transform=build_eval_transforms(self.image_size))
 
+    def _use_pin_memory(self) -> bool:
+        try:
+            import torch
+            return torch.cuda.is_available()
+        except Exception:
+            return False
+
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        pin = self._use_pin_memory()
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=pin,
+            persistent_workers=self.num_workers > 0,
+            drop_last=True,
+        )
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        pin = self._use_pin_memory()
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=pin,
+            persistent_workers=self.num_workers > 0,
+        )
 
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        pin = self._use_pin_memory()
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=pin,
+        )
