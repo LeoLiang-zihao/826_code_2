@@ -1,0 +1,4 @@
+interface:
+  display_name: "DCC PhysioNet Download"
+  short_description: "Parallel PhysioNet downloads on Duke DCC"
+  default_prompt: "Use $dcc-physionet-download to set up or troubleshoot a resumable parallel PhysioNet download on Duke DCC."

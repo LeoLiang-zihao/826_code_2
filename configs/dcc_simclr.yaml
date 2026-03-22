@@ -1,0 +1,33 @@
+seed: 826
+output_dir: outputs/dcc_simclr
+data:
+  manifest_path: /work/your_netid/cxr_project/data/manifests/mimic_subset_manifest.csv
+  batch_size: 64
+  num_workers: 4
+  image_size: 224
+model:
+  name: resnet50
+  pretrained: true
+  fine_tune_mode: head_only
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+trainer:
+  accelerator: gpu
+  devices: 1
+  max_epochs: 10
+  precision: 16-mixed
+  deterministic: true
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  log_every_n_steps: 10
+runtime:
+  experiment_name: dcc_simclr
+  create_manifest_if_missing: false
+simclr:
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  projection_hidden_dim: 512
+  projection_dim: 128
+  temperature: 0.2
+evaluation:
+  bootstrap_samples: 1000

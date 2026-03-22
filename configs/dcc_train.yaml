@@ -1,0 +1,25 @@
+seed: 826
+output_dir: outputs/dcc_train
+data:
+  manifest_path: /work/your_netid/cxr_project/data/manifests/mimic_subset_manifest.csv
+  batch_size: 32
+  num_workers: 4
+  image_size: 224
+model:
+  name: resnet50
+  pretrained: true
+  fine_tune_mode: last2
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+trainer:
+  accelerator: gpu
+  devices: 1
+  max_epochs: 8
+  precision: 16-mixed
+  deterministic: true
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  log_every_n_steps: 10
+runtime:
+  experiment_name: dcc_train
+  create_manifest_if_missing: false

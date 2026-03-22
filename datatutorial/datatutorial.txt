@@ -1,0 +1,30 @@
+Command and working procedure for downloading a subset of MIMIC-CXR-JPG
+
+Hi All, 
+
+Several students have reported difficulty downloading the full dataset. If you run into this issue, it is completely fine to work with a subset of the dataset (e.g., folder p10) as Matt said in the announcement. The PhysioNet portal for MIMIC-CXR-JPG provides instructions for downloading subsets of the image files, please refer the following link: https://physionet.org/content/mimic-cxr-jpg/2.1.0/#files-panel Links to an external site. and see the screenshot below. I also wrap up the procedure and command for subset data downloading for you reference.
+
+
+The following is the procedure for downloading the subset image files, usually it is better to use a cpu computation node (either in common partition or courses partition) instead of login node for the downloading process and the dowloading speed heavily depends on the the networks bandwidth and uaually after midnight the speed will become faster: 
+Recommended procedure for downloading a subset
+
+    You first need to download the IMAGE_FILENAMES file (show in the screenshot) in the data portal, and then upload to your workspace in dcc, or you could directly use wget in the dcc terminal to download this file.image.png
+    Then after you download the IMAGE_FILENAMES, using following commands to download the subfolder of p10, you need to change the <you_passwd_here>  to your password and <your_user_name> to your username. The nohup command is just letting you running the command in the backend, and you can also check your downloading process in the log file: download_MIMIC-CXR-JPG.log, using this command: tail -20f download_MIMIC-CXR-JPG.log. If you find out the downloading process is not complete, just run the  following command again, and it will continue to download the rest of the files.
+
+        passwd='<you_passwd_here>'
+
+        grep "^files/p10/" physionet.org/files/mimic-cxr-jpg/2.1.0/IMAGE_FILENAMES | nohup wget -r -N -c -np -nH --cut-dirs=1 --user <your_user_name> --password $passwd -i - --base=https://physionet.org/files/mimic-cxr-jpg/2.1.0/ Links to an external site. > download_MIMIC-CXR-JPG.log 2>&1 &
+
+    Change the directory of the IMAGE_FILENAMES as needed in the above command.
+    For the full dataset download, you could either download the dataset using the official command as the webpage indicates: wget -r -N -c -np --user <your_user_name> --ask-password https://physionet.org/files/mimic-cxr-jpg/2.1.0/ Links to an external site., or using the nohup command: nohup wget -r -N -c -np --user <your_user_name> --password $passwd https://physionet.org/files/mimic-cxr-jpg/2.1.0/ Links to an external site. > download.log 2>&1 &,
+    Note that you need to run passwd='<you_passwd_here>' in the terminal first, to assign you password to the variable passwd.
+
+        It is recommended to run the download comand on a CPU compute node (e.g., in the common or courses partition) rather than on the login node.
+        For the data storage, I recommend that you download the full dataset to the /work/<netid> or /cwork/<netid> folder, since the full dataset is over 500G, and the directory under /work or /cwork has larger volumes for temporary data storage.
+
+        Finally, note that download speed depends heavily on network bandwidth, and it is often faster late at night or after midnight.
+
+     
+    Let me know if you run into any problem or have any further questions.
+    Best,
+    Xiangyu

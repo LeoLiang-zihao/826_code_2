@@ -1,0 +1,40 @@
+seed: 826
+output_dir: outputs/local_simclr_synthetic
+data:
+  manifest_path: data/synthetic/manifest.csv
+  batch_size: 8
+  num_workers: 0
+  image_size: 96
+model:
+  name: resnet18
+  pretrained: false
+  learning_rate: 0.001
+  weight_decay: 0.0001
+simclr:
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  temperature: 0.2
+  projection_hidden_dim: 128
+  projection_dim: 64
+trainer:
+  accelerator: cpu
+  devices: 1
+  max_epochs: 1
+  precision: 32
+  deterministic: true
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  log_every_n_steps: 1
+runtime:
+  experiment_name: local_simclr_synthetic
+  create_manifest_if_missing: true
+  synthetic:
+    num_subjects: 36
+    positives_fraction: 0.5
+    seed: 826
+evaluation:
+  bootstrap_samples: 25
+attribution:
+  num_positive: 5
+  num_negative: 5
+
