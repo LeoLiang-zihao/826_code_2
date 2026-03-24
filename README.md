@@ -68,3 +68,11 @@ sbatch jobs/dcc_embeddings.sbatch
 ```
 
 All DCC jobs use the same Python entrypoints as local runs. Before submission, update the manifest path in `configs/dcc_train.yaml` or `configs/dcc_simclr.yaml`, and set required environment variables such as `SIMCLR_CHECKPOINT` or `CHECKPOINT_PATH` where needed.
+
+For the Part 2 supervised ablation required by the assignment, submit all four fine-tuning depths with:
+
+```bash
+bash scripts/submit_dcc_supervised_ablation.sh
+```
+
+This submits `head_only`, `last1`, `last2`, and `full` as separate jobs with separate output directories under `outputs/`.
