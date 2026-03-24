@@ -76,3 +76,23 @@ bash scripts/submit_dcc_supervised_ablation.sh
 ```
 
 This submits `head_only`, `last1`, `last2`, and `full` as separate jobs with separate output directories under `outputs/`.
+
+To submit the main DCC pipeline with job dependencies so downstream experiments run automatically, use:
+
+```bash
+bash scripts/submit_dcc_pipeline.sh
+```
+
+This submits:
+
+- the four supervised ablations
+- Grad-CAM attribution after the `full` supervised run completes
+- SimCLR pretraining
+- frozen linear evaluation after SimCLR completes
+- embedding export after SimCLR completes
+
+To also schedule the expensive bootstrap reruns for `head_only` and `full`, use:
+
+```bash
+ENABLE_BOOTSTRAP=1 bash scripts/submit_dcc_pipeline.sh
+```
